@@ -1,0 +1,874 @@
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+	<title>FcxV2</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+	<script type="text/javascript"
+		src="http://api.map.baidu.com/api?v=3.0&ak==HdNp3wthPQqF4tor0jQK0IQy65DWI4jD"></script>
+</head>
+
+<body style="background-color: #51938e; margin: 0 auto">
+	<span style="
+        text-align: center;
+        margin-left: 20px;
+        font-size: 23px;
+        font-style: italic;
+      "><b>基于空气质量指数的诱导路径规划系统</b></span>
+	<span id="timer" style="
+        text-align: center;
+        font-size: 20px;
+        font-style: italic;
+        margin-left: 1095px;
+      "></span>
+	<div style="width: 100%; height: 100%; margin: 5px auto; text-align: center">
+		<div style="width: 100%; height: 40%; text-align: center">
+			起点：<input id="start" type="text" value="" style="margin-right: 80px; width: 190px" />
+			终点：<input id="end" value="" type="text" />
+			<input type="button" value="查询" onclick="findWay();" /><br />
+			<span style="color: purple; margin-left: 343px; margin-right: 10px">最短路径：<input id="short"
+					style="width: 210px; color: purple" /></span>
+			<span style="color: blue; margin-left: 39px; margin-right: 395px">诱导路径：<input id="green"
+					style="width: 210px; color: blue" /></span><br />
+		</div>
+		<div id="container" style="
+          position: absolute;
+          margin-top: 40px;
+          width: 100%;
+          height: 95%;
+          top: 49;
+          border: 1px solid gray;
+          overflow: hidden;
+        "></div>
+	</div>
+</body>
+<script type="text/javascript">
+	function getDateDemo() {
+		//分别获取年、月、日、时、分、秒
+		var myDate = new Date();
+		var year = myDate.getFullYear();
+		var month = myDate.getMonth() + 1;
+		var date = myDate.getDate();
+		var hours = myDate.getHours();
+		var minutes = myDate.getMinutes();
+		var seconds = myDate.getSeconds();
+
+		//月份的显示为两位数字如09月
+		if (month < 10) {
+			month = "0" + month;
+		}
+		if (date < 10) {
+			date = "0" + date;
+		}
+
+		//时间拼接
+		var dateTime =
+			year +
+			"年" +
+			month +
+			"月" +
+			date +
+			"日" +
+			hours +
+			"时" +
+			minutes +
+			"分" +
+			seconds +
+			"秒";
+
+		//document.write(dateTime);//打印当前时间
+
+		var divNode = document.getElementById("timer");
+		divNode.innerHTML = dateTime;
+	}
+
+	window.setInterval("getDateDemo()", 1000); //每隔1秒，调用一次getDateDemo()
+</script>
+<script type="text/javascript">
+	var map = new BMap.Map("container");
+	map.centerAndZoom(new BMap.Point(119.497689, 32.410108), 13); // 初始化地图,设置中心点坐标和地图级别
+	map.setMapStyleV2({
+		styleId: "958c8972c633f65131c8ad13e16b8511",
+	});
+	map.setCurrentCity("扬州市");
+	map.enableScrollWheelZoom(); //启用滚轮放大缩小，默认禁用
+	map.enableContinuousZoom(); //启用地图惯性拖拽，默认禁用
+	map.addControl(new BMap.NavigationControl()); //添加默认缩放平移控件
+	map.addControl(new BMap.OverviewMapControl()); //添加默认缩略地图控件
+	// 终点
+	var endPoint = new BMap.Point(119.420658, 32.412969);
+	var endIcon = new BMap.Icon("./img/end.png", new BMap.Size(300, 100), {
+		anchor: new BMap.Size(0, 40),
+	});
+	var endMarker = new BMap.Marker(endPoint, {
+		icon: endIcon,
+	});
+	map.addOverlay(endMarker);
+	var label = new BMap.Label("39", {
+		offset: new BMap.Size(20, -15),
+	});
+	endMarker.setLabel(label);
+	// 终点描述信息
+	var endOpts = {
+		width: 250, // 信息窗口宽度
+		height: 10, // 信息窗口高度
+		title: "", // 信息窗口标题
+	};
+	var infoWindow = new BMap.InfoWindow(
+		"瘦西湖风景区<br>地址：扬州市邗江区大虹桥路28号",
+		endOpts
+	); // 创建信息窗口对象
+	endMarker.addEventListener("click", function () {
+		map.openInfoWindow(infoWindow, endPoint); //开启信息窗口
+	});
+
+	// 监测点
+	var data_info = [
+		[
+			119.402,
+			32.351,
+			"汊河街道办<br>AQI：137<br>质量等级：轻度污染<br>PM2.5：104<br>PM10：182<br>SO2：68<br>CO：1.1<br>NO2：60<br>O3_8h：58",
+		],
+		[
+			119.421,
+			32.359,
+			"扬子津街道办<br>AQI：170<br>质量等级：中度污染<br>PM2.5：129<br>PM10：220<br>SO2：78<br>CO：1.5<br>NO2：66<br>O3_8h：42",
+		],
+		[
+			119.454,
+			32.372,
+			"文峰街道办<br>AQI：255<br>质量等级：重度污染<br>PM2.5：205<br>PM10：325<br>SO2：99<br>CO：2.2<br>NO2：70<br>O3_8h：34",
+		],
+		[
+			119.431,
+			32.434,
+			"瘦西湖街道办事处<br>AQI：248<br>质量等级：重度污染<br>PM2.5：198<br>PM10：259<br>SO2：38<br>CO：2.1<br>NO2：43<br>O3_8h：38",
+		],
+		[
+			119.513,
+			32.38,
+			"广陵经济开发区<br>AQI：262<br>质量等级：重度污染<br>PM2.5：212<br>PM10：273<br>SO2：29<br>CO：1.9<br>NO2：31<br>O3_8h：44",
+		],
+		[
+			119.475,
+			32.445,
+			"竹西街道<br>AQI：187<br>质量等级：中度污染<br>PM2.5：141<br>PM10：182<br>SO2：41<br>CO：1.6<br>NO2：24<br>O3_8h：34",
+		],
+		[
+			119.451,
+			32.488,
+			"槐泗镇人民政府<br>AQI：206<br>质量等级：重度污染<br>PM2.5：156<br>PM10：229<br>SO2：24<br>CO：2.3<br>NO2：24<br>O3_8h：23",
+		],
+		[
+			119.576,
+			32.44,
+			"江都区人民政府<br>AQI：81<br>质量等级：良<br>PM2.5：58<br>PM10：112<br>SO2：13<br>CO：0.8<br>NO2：15<br>O3_8h：48",
+		],
+	];
+	var opts = {
+		width: 250, // 信息窗口宽度
+		height: 200, // 信息窗口高度
+		title: "", // 信息窗口标题
+		enableMessage: true, //设置允许信息窗发送短息
+	};
+	for (var i = 0; i < data_info.length; i++) {
+		var ricon = new BMap.Icon("./img/radar.png", new BMap.Size(300, 100), {
+			anchor: new BMap.Size(6, 40),
+		});
+		var marker = new BMap.Marker(
+			new BMap.Point(data_info[i][0], data_info[i][1]),
+			{
+				icon: ricon,
+			}
+		); // 创建标注
+		var content = data_info[i][2];
+		map.addOverlay(marker); // 将标注添加到地图中
+		addClickHandler(content, marker);
+	}
+
+	function addClickHandler(content, marker) {
+		marker.addEventListener("click", function (e) {
+			openInfo(content, e);
+		});
+	}
+
+	function openInfo(content, e) {
+		var p = e.target;
+		var point = new BMap.Point(p.getPosition().lng, p.getPosition().lat);
+		var infoWindow = new BMap.InfoWindow(content, opts); // 创建信息窗口对象
+		map.openInfoWindow(infoWindow, point); //开启信息窗口
+	}
+
+	var points = [
+		{
+			x: 119.359,
+			y: 32.428,
+			c: "1",
+		},
+		{
+			x: 119.372,
+			y: 32.344,
+			c: "2",
+		},
+		{
+			x: 119.643,
+			y: 32.407,
+			c: "3",
+		},
+		{
+			x: 119.601,
+			y: 32.493,
+			c: "4",
+		},
+		{
+			x: 119.3845,
+			y: 32.4235,
+			c: "5",
+		},
+		{
+			x: 119.399,
+			y: 32.445,
+			c: "6",
+		},
+		{
+			x: 119.41,
+			y: 32.435,
+			c: "7",
+		},
+		{
+			x: 119.391,
+			y: 32.396,
+			c: "8",
+		},
+		{
+			x: 119.3964,
+			y: 32.3706,
+			c: "9",
+		},
+		{
+			x: 119.424,
+			y: 32.3789,
+			c: "10",
+		},
+		{
+			x: 119.4799,
+			y: 32.4452,
+			c: "11",
+		},
+		{
+			x: 119.4823,
+			y: 32.3936,
+			c: "12",
+		},
+		{
+			x: 119.451,
+			y: 32.3825,
+			c: "13",
+		},
+		{
+			x: 119.4809,
+			y: 32.3789,
+			c: "14",
+		},
+		{
+			x: 119.4804,
+			y: 32.368,
+			c: "15",
+		},
+		{
+			x: 119.5148,
+			y: 32.391,
+			c: "16",
+		},
+		{
+			x: 119.5995,
+			y: 32.41,
+			c: "17",
+		},
+		{
+			x: 119.5925,
+			y: 32.431,
+			c: "18",
+		},
+		{
+			x: 119.6014,
+			y: 32.3999,
+			c: "19",
+		},
+		{
+			x: 119.6137,
+			y: 32.4399,
+			c: "20",
+		},
+		{
+			x: 119.6189,
+			y: 32.4137,
+			c: "21",
+		},
+		{
+			x: 119.6218,
+			y: 32.4,
+			c: "22",
+		},
+		{
+			x: 119.5898,
+			y: 32.492,
+			c: "23",
+		},
+		{
+			x: 119.4861,
+			y: 32.4725,
+			c: "24",
+		},
+		{
+			x: 119.3901,
+			y: 32.455,
+			c: "25",
+		},
+		{
+			x: 119.3512,
+			y: 32.3904,
+			c: "26",
+		},
+		{
+			x: 119.3679,
+			y: 32.3565,
+			c: "27",
+		},
+		{
+			x: 119.3998,
+			y: 32.355,
+			c: "28",
+		},
+		{
+			x: 119.4274,
+			y: 32.3579,
+			c: "29",
+		},
+		{
+			x: 119.4685,
+			y: 32.3635,
+			c: "30",
+		},
+		{
+			x: 119.6019,
+			y: 32.384,
+			c: "31",
+		},
+		{
+			x: 119.624,
+			y: 32.3901,
+			c: "32",
+		},
+		{
+			x: 119.6358,
+			y: 32.4233,
+			c: "33",
+		},
+		{
+			x: 119.6537,
+			y: 32.4155,
+			c: "34",
+		},
+		{
+			x: 119.6235,
+			y: 32.4465,
+			c: "35",
+		},
+		{
+			x: 119.588,
+			y: 32.434,
+			c: "36",
+		},
+		{
+			x: 119.582,
+			y: 32.454,
+			c: "37",
+		},
+		{
+			x: 119.542,
+			y: 32.48,
+			c: "38",
+		},
+		{
+			x: 119.437358,
+			y: 32.400478,
+			c: "S1",
+		},
+		{
+			x: 119.440151,
+			y: 32.400581,
+			c: "S2",
+		},
+		{
+			x: 119.437412,
+			y: 32.398862,
+			c: "S3",
+		},
+		{
+			x: 119.437277,
+			y: 32.397262,
+			c: "S4",
+		},
+		{
+			x: 119.439918,
+			y: 32.39757,
+			c: "S5",
+		},
+		{
+			x: 119.441634,
+			y: 32.397425,
+			c: "S6",
+		},
+		{
+			x: 119.442348,
+			y: 32.39741,
+			c: "S7",
+		},
+		{
+			x: 119.442662,
+			y: 32.399144,
+			c: "S8",
+		},
+		{
+			x: 119.437277,
+			y: 32.397254,
+			c: "S9",
+		},
+		{
+			x: 119.439909,
+			y: 32.397582,
+			c: "S10",
+		},
+		{
+			x: 119.439491,
+			y: 32.397143,
+			c: "S11",
+		},
+		{
+			x: 119.442348,
+			y: 32.397414,
+			c: "S12",
+		},
+		{
+			x: 119.442348,
+			y: 32.396393,
+			c: "S13",
+		},
+		{
+			x: 119.443664,
+			y: 32.397063,
+			c: "S14",
+		},
+		{
+			x: 119.443673,
+			y: 32.397387,
+			c: "S15",
+		},
+		{
+			x: 119.44365,
+			y: 32.39778,
+			c: "S16",
+		},
+		{
+			x: 119.443623,
+			y: 32.399095,
+			c: "S17",
+		},
+		{
+			x: 119.445676,
+			y: 32.400021,
+			c: "S18",
+		},
+		{
+			x: 119.445797,
+			y: 32.399274,
+			c: "S19",
+		},
+		{
+			x: 119.445658,
+			y: 32.398805,
+			c: "S20",
+		},
+		{
+			x: 119.445627,
+			y: 32.396976,
+			c: "S21",
+		},
+		{
+			x: 119.445559,
+			y: 32.39645,
+			c: "S22",
+		},
+		{
+			x: 119.445092,
+			y: 32.396488,
+			c: "S23",
+		},
+		{
+			x: 119.447621,
+			y: 32.400005,
+			c: "S24",
+		},
+		{
+			x: 119.447684,
+			y: 32.399342,
+			c: "S25",
+		},
+		{
+			x: 119.447019,
+			y: 32.399297,
+			c: "S26",
+		},
+		{
+			x: 119.44785,
+			y: 32.397231,
+			c: "S27",
+		},
+		{
+			x: 119.447899,
+			y: 32.396549,
+			c: "S28",
+		},
+		{
+			x: 119.44635,
+			y: 32.396145,
+			c: "S29",
+		},
+		{
+			x: 119.445618,
+			y: 32.396968,
+			c: "S30",
+		},
+		{
+			x: 119.444594,
+			y: 32.396256,
+			c: "S31",
+		},
+		{
+			x: 119.443677,
+			y: 32.396385,
+			c: "S32",
+		},
+		{
+			x: 119.43725,
+			y: 32.395208,
+			c: "S33",
+		},
+		{
+			x: 119.439675,
+			y: 32.394255,
+			c: "S34",
+		},
+		{
+			x: 119.440192,
+			y: 32.394293,
+			c: "S35",
+		},
+		{
+			x: 119.441962,
+			y: 32.394419,
+			c: "S36",
+		},
+		{
+			x: 119.442501,
+			y: 32.394468,
+			c: "S37",
+		},
+		{
+			x: 119.444418,
+			y: 32.394495,
+			c: "S38",
+		},
+		{
+			x: 119.445649,
+			y: 32.394689,
+			c: "S39",
+		},
+		{
+			x: 119.447989,
+			y: 32.395417,
+			c: "S40",
+		},
+		{
+			x: 119.448173,
+			y: 32.394575,
+			c: "S41",
+		},
+		{
+			x: 119.449287,
+			y: 32.394602,
+			c: "S42",
+		},
+		{
+			x: 119.451124,
+			y: 32.394644,
+			c: "S43",
+		},
+		{
+			x: 119.450936,
+			y: 32.395791,
+			c: "S44",
+		},
+		{
+			x: 119.449781,
+			y: 32.396442,
+			c: "S45",
+		},
+		{
+			x: 119.451573,
+			y: 32.398085,
+			c: "S46",
+		},
+		{
+			x: 119.450383,
+			y: 32.400093,
+			c: "S47",
+		},
+	];
+
+	for (var i = 0; i < 85; i++) {
+		if (i < 38) {
+			var marker = new BMap.Marker(new BMap.Point(points[i].x, points[i].y));
+			map.addOverlay(marker);
+			var label = new BMap.Label(i + 1, {
+				offset: new BMap.Size(2, 3),
+			});
+			label.setStyle({
+				background: "none",
+				color: "#fff",
+				border: "none", //只要对label样式进行设置就可达到在标注图标上显示数字的效果
+			});
+			marker.setLabel(label);
+		} else {
+			var ricon = new BMap.Icon("./img/screen.png", new BMap.Size(300, 100), {
+			anchor: new BMap.Size(6, 40),
+			});
+			var marker = new BMap.Marker(
+				new BMap.Point(points[i].x, points[i].y),
+				{
+					icon: ricon,
+				}
+			); // 创建标注
+			map.addOverlay(marker); // 将标注添加到地图中
+		}
+	}
+
+
+	function findWay() {
+		// window.location.reload();
+		var start = document.getElementById("start").value;
+		var end = document.getElementById("");
+		if (start === "1") {
+			document.getElementById("short").value = "1-25-6-7-39";
+			document.getElementById("green").value = "1-5-6-7-39";
+			var short_points = [
+				new BMap.Point(points[0].x, points[0].y),
+				new BMap.Point(119.364, 32.437),
+				new BMap.Point(119.372, 32.445),
+				new BMap.Point(119.379, 32.45),
+				new BMap.Point(points[24].x, points[24].y),
+				new BMap.Point(points[5].x, points[5].y),
+				new BMap.Point(119.405, 32.441),
+				new BMap.Point(points[6].x, points[6].y),
+				new BMap.Point(119.420658, 32.412969),
+			];
+			var green_points = [
+				new BMap.Point(points[0].x, points[0].y),
+				new BMap.Point(119.37, 32.426),
+				new BMap.Point(119.379, 32.426),
+				new BMap.Point(points[4].x, points[4].y),
+				new BMap.Point(119.388, 32.437),
+				new BMap.Point(points[5].x, points[5].y),
+				new BMap.Point(119.405, 32.441),
+				new BMap.Point(points[6].x, points[6].y),
+				new BMap.Point(119.420658, 32.412969),
+			];
+			var short_polyline = new BMap.Polyline(short_points, {
+				strokeColor: "purple",
+				strokeWeight: 5,
+				strokeStyle: "dashed",
+			});
+			map.addOverlay(short_polyline);
+			var green_polyline = new BMap.Polyline(green_points, {
+				strokeColor: "blue",
+				strokeOpacity: 0.3,
+				strokeWeight: 5,
+			});
+			map.addOverlay(green_polyline);
+		} else if (start === "4") {
+			document.getElementById("short").value = "4-23-38-24-11-7-39";
+			document.getElementById("green").value = "4-23-38-24-11-7-39";
+			var short_points = [
+				new BMap.Point(points[3].x, points[3].y),
+				new BMap.Point(119.595, 32.493),
+				new BMap.Point(points[22].x, points[22].y),
+				new BMap.Point(119.579, 32.489),
+				new BMap.Point(119.556, 32.486),
+				new BMap.Point(points[37].x, points[37].y),
+				new BMap.Point(119.516, 32.475),
+				new BMap.Point(119.506, 32.474),
+				new BMap.Point(points[23].x, points[23].y),
+				new BMap.Point(119.482, 32.464),
+				new BMap.Point(119.481, 32.46),
+				new BMap.Point(119.481226, 32.452121),
+				new BMap.Point(119.480364, 32.44554),
+				new BMap.Point(119.467141, 32.444809),
+				new BMap.Point(119.45938, 32.443346),
+				new BMap.Point(119.455643, 32.443346),
+				new BMap.Point(119.446444, 32.446027),
+				new BMap.Point(119.436671, 32.446515),
+				new BMap.Point(119.428622, 32.445784),
+				new BMap.Point(points[6].x, points[6].y),
+				new BMap.Point(119.420658, 32.412969),
+			];
+			var green_points = [
+				new BMap.Point(points[3].x, points[3].y),
+				new BMap.Point(119.595, 32.493),
+				new BMap.Point(points[22].x, points[22].y),
+				new BMap.Point(119.579, 32.489),
+				new BMap.Point(119.556, 32.486),
+				new BMap.Point(points[37].x, points[37].y),
+				new BMap.Point(119.516, 32.475),
+				new BMap.Point(119.506, 32.474),
+				new BMap.Point(points[23].x, points[23].y),
+				new BMap.Point(119.482, 32.464),
+				new BMap.Point(119.481, 32.46),
+				new BMap.Point(119.481226, 32.452121),
+				new BMap.Point(119.480364, 32.44554),
+				new BMap.Point(119.467141, 32.444809),
+				new BMap.Point(119.45938, 32.443346),
+				new BMap.Point(119.455643, 32.443346),
+				new BMap.Point(119.446444, 32.446027),
+				new BMap.Point(119.436671, 32.446515),
+				new BMap.Point(119.428622, 32.445784),
+				new BMap.Point(points[6].x, points[6].y),
+				new BMap.Point(119.420658, 32.412969),
+			];
+			var short_polyline = new BMap.Polyline(short_points, {
+				strokeColor: "purple",
+				strokeWeight: 5,
+				strokeStyle: "dashed",
+			});
+			map.addOverlay(short_polyline);
+			var green_polyline = new BMap.Polyline(green_points, {
+				strokeColor: "blue",
+				strokeOpacity: 0.3,
+				strokeWeight: 5,
+			});
+			map.addOverlay(green_polyline);
+		} else if (start === "34") {
+			document.getElementById("short").value = "34-3-32-31-30-29-10-39";
+			document.getElementById("green").value =
+				"34-33-35-20-18-36-16-12-13-10-39";
+			var short_points = [
+				new BMap.Point(points[33].x, points[33].y),
+				new BMap.Point(119.648239, 32.41165),
+				new BMap.Point(points[2].x, points[2].y),
+				new BMap.Point(119.639328, 32.403603),
+				new BMap.Point(119.634441, 32.397506),
+				new BMap.Point(119.63013, 32.393847),
+				new BMap.Point(points[31].x, points[31].y),
+				new BMap.Point(119.617481, 32.387993),
+				new BMap.Point(119.613744, 32.38653),
+				new BMap.Point(points[30].x, points[30].y),
+				new BMap.Point(119.596497, 32.384578),
+				new BMap.Point(119.587586, 32.382627),
+				new BMap.Point(119.582412, 32.381895),
+				new BMap.Point(119.572638, 32.37726),
+				new BMap.Point(119.568039, 32.375308),
+				new BMap.Point(119.55654, 32.368477),
+				new BMap.Point(119.549354, 32.363842),
+				new BMap.Point(119.538646, 32.361646),
+				new BMap.Point(119.522549, 32.35823),
+				new BMap.Point(119.508751, 32.357742),
+				new BMap.Point(119.482592, 32.36189),
+				new BMap.Point(119.46362, 32.363354),
+				new BMap.Point(119.44781, 32.356522),
+				new BMap.Point(points[28].x, points[28].y),
+				new BMap.Point(119.423735, 32.372198),
+				new BMap.Point(points[9].x, points[9].y),
+				new BMap.Point(119.420658, 32.412969),
+			];
+			var green_points = [
+				new BMap.Point(points[33].x, points[33].y),
+				new BMap.Point(119.645868, 32.416771),
+				new BMap.Point(points[32].x, points[32].y),
+				new BMap.Point(points[34].x, points[34].y),
+				new BMap.Point(points[19].x, points[19].y),
+				new BMap.Point(points[17].x, points[17].y),
+				new BMap.Point(119.587945, 32.434814),
+				new BMap.Point(119.570698, 32.427256),
+				new BMap.Point(119.566386, 32.424086),
+				new BMap.Point(119.565524, 32.422867),
+				new BMap.Point(119.561787, 32.422623),
+				new BMap.Point(119.555463, 32.425062),
+				new BMap.Point(119.554025, 32.425793),
+				new BMap.Point(119.541665, 32.427012),
+				new BMap.Point(119.531891, 32.427256),
+				new BMap.Point(119.527292, 32.426037),
+				new BMap.Point(119.513781, 32.424574),
+				new BMap.Point(119.509182, 32.420429),
+				new BMap.Point(119.508032, 32.414333),
+				new BMap.Point(119.513781, 32.401896),
+				new BMap.Point(points[15].x, points[15].y),
+				new BMap.Point(points[11].x, points[11].y),
+				new BMap.Point(119.463763, 32.394335),
+				new BMap.Point(119.462901, 32.388969),
+				new BMap.Point(119.458302, 32.384578),
+				new BMap.Point(points[12].x, points[12].y),
+				new BMap.Point(119.439042, 32.384091),
+				new BMap.Point(119.434299, 32.383725),
+				new BMap.Point(119.426538, 32.38031),
+				new BMap.Point(points[9].x, points[9].y),
+				new BMap.Point(119.420658, 32.412969),
+			];
+			var short_polyline = new BMap.Polyline(short_points, {
+				strokeColor: "purple",
+				strokeWeight: 5,
+				strokeStyle: "dashed",
+			});
+			map.addOverlay(short_polyline);
+			var green_polyline = new BMap.Polyline(green_points, {
+				strokeColor: "blue",
+				strokeOpacity: 0.3,
+				strokeWeight: 5,
+			});
+			map.addOverlay(green_polyline);
+		} else if (start === "2") {
+			document.getElementById("short").value = "2-27-9-10-39";
+			document.getElementById("green").value = "2-28-29-10-39";
+			var short_points = [
+				new BMap.Point(points[1].x, points[1].y),
+				new BMap.Point(points[26].x, points[26].y),
+				new BMap.Point(119.375083, 32.363964),
+				new BMap.Point(points[8].x, points[8].y),
+				new BMap.Point(119.406703, 32.372991),
+				new BMap.Point(points[9].x, points[9].y),
+				new BMap.Point(119.420658, 32.412969),
+			];
+			var green_points = [
+				new BMap.Point(points[1].x, points[1].y),
+				new BMap.Point(points[27].x, points[27].y),
+				new BMap.Point(points[28].x, points[28].y),
+				new BMap.Point(119.423735, 32.372198),
+				new BMap.Point(points[9].x, points[9].y),
+				new BMap.Point(119.420658, 32.412969),
+			];
+			var short_polyline = new BMap.Polyline(short_points, {
+				strokeColor: "purple",
+				strokeWeight: 5,
+				strokeStyle: "dashed",
+			});
+			map.addOverlay(short_polyline);
+			var green_polyline = new BMap.Polyline(green_points, {
+				strokeColor: "blue",
+				strokeOpacity: 0.3,
+				strokeWeight: 5,
+			});
+			map.addOverlay(green_polyline);
+		}
+	}
+</script>
+
+</html>
